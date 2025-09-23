@@ -1,0 +1,50 @@
+{
+  "name": "connections-service",
+  "version": "1.0.0",
+  "description": "Connections Service with Nango token vault integration for Wuwei ecosystem",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "lint": "eslint .",
+    "migrate": "sequelize db:migrate --config database/config/config.js --migrations-path database/migrations",
+    "migrate:undo": "sequelize db:migrate:undo --config database/config/config.js --migrations-path database/migrations",
+    "migrate:undo:all": "sequelize db:migrate:undo:all --config database/config/config.js --migrations-path database/migrations",
+    "migration:generate": "sequelize migration:generate  --config database/config/config.js --migrations-path database/migrations --name $1"
+  },
+  "dependencies": {
+    "@nangohq/node": "^0.67.6",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "fs": "^0.0.1-security",
+    "helmet": "^7.0.0",
+    "https": "^1.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.2.0",
+    "node-fetch": "^2.7.0",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.7",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "sequelize-cli": "^6.6.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "oauth",
+    "connections",
+    "nango",
+    "wuwei",
+    "microservice"
+  ],
+  "author": "Wuwei Team",
+  "license": "MIT"
+}

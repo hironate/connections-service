@@ -1,0 +1,40 @@
+services:
+  cs-postgres:
+    image: postgres:16
+    ports:
+      - 5434:5432
+    environment:
+      POSTGRES_USER: connections-service
+      POSTGRES_PASSWORD: connections-service
+      POSTGRES_DB: connections_service
+    volumes:
+      - cs-postgres-data:/var/lib/postgresql/data
+    networks:
+      - tempura-network
+
+  connections-service:
+    build:
+      context: ../
+      dockerfile: Dockerfile-local.dockerfile
+    ports:
+      - '3004:3004'
+    tty: true
+    entrypoint: ['/bin/sh', '-c']
+    volumes:
+      - ../:/app
+    command:
+      - |
+        npm i
+        npm run migrate
+        npm run dev
+    depends_on:
+      - cs-postgres
+    networks:
+      - tempura-network
+
+volumes:
+  cs-postgres-data: {}
+
+networks:
+  tempura-network:
+    driver: bridge
