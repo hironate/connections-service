@@ -37,8 +37,33 @@ function normalizeScopes(scopes) {
   return scopes.map((scope) => scope.toLowerCase());
 }
 
+/**
+ * Filters connection data to only include non-confidential fields
+ * @param {Object} connection - The connection object from database
+ * @returns {Object} - Filtered connection object with only safe fields
+ */
+function filterConnectionData(connection) {
+  if (!connection) return null;
+
+  const connectionData = connection.toJSON ? connection.toJSON() : connection;
+
+  return {
+    id: connectionData.id,
+    tenantId: connectionData.tenantId,
+    sub: connectionData.sub,
+    provider: connectionData.provider,
+    status: connectionData.status,
+    scopes: connectionData.authorizedScopes,
+    authMode: connectionData.authMode,
+    lastAccessedAt: connectionData.lastAccessedAt,
+    createdAt: connectionData.createdAt,
+    updatedAt: connectionData.updatedAt,
+  };
+}
+
 module.exports = {
   generateConnectionId,
   encodeBase58,
   normalizeScopes,
+  filterConnectionData,
 };

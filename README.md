@@ -18,23 +18,25 @@ This service acts as a secure proxy between your application and OAuth providers
 - **Multi-Tenant**: Supports multiple tenants/workspaces
 - **Zero Token Exposure**: Client applications never see OAuth tokens
 - **Database Storage**: PostgreSQL with Sequelize ORM for connection management
-- **Audit Logging**: Comprehensive audit trail for all operations
+- **Audit Logging**: Comprehensive audit trail with automatic data sanitization for security
 
 ## API Endpoints
 
 ### OAuth Flow
 
-- `POST /tenants/{tenantId}/connections` - Initiate OAuth flow
+- `POST /v1/tenants/{tenantId}/connections` - Initiate OAuth flow
 - `GET /oauth/callback` - Handle OAuth redirects (redirects to Nango)
+
+### Connection Management
+
+- `GET /v1/tenants/{tenantId}/connections` - List all connections for a tenant
+- `GET /v1/tenants/{tenantId}/connections/{connectionId}` - Get specific connection status
+- `PATCH /v1/tenants/{tenantId}/connections/{connectionId}` - Update connection details
+- `DELETE /v1/tenants/{tenantId}/connections/{connectionId}` - Delete connection
 
 ### Webhooks
 
 - `POST /webhooks/nango` - Receive Nango webhook notifications
-
-### Management
-
-- `GET /tenants/{tenantId}/connections/{connectionId}` - Get connection status
-- `DELETE /tenants/{tenantId}/connections/{connectionId}` - Delete connection
 
 ### Health & Monitoring
 
@@ -87,8 +89,8 @@ MTLS_CERT_PATH=/path/to/connections-service.crt
 MTLS_KEY_PATH=/path/to/connections-service.key
 MTLS_CA_PATH=/path/to/ca.crt
 
-# Client Application API
-CLIENT_API_URL=https://your-app.com
+# Central Service (Wuwei) API
+CENTRAL_SERVICE_URL=https://your-wuwei-api.com
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3002,http://localhost:3003
 ```
 
@@ -104,7 +106,7 @@ createdb connections_service
 npm run migrate
 ```
 
-For detailed database setup instructions, see [DATABASE_SETUP.md](DATABASE_SETUP.md).
+The database will be automatically configured using Sequelize migrations.
 
 ### 4. Configure Nango
 
@@ -127,7 +129,7 @@ npm start
 ### 1. Initiate Connection
 
 ```http
-POST /tenants/my-tenant/connections
+POST /v1/tenants/my-tenant/connections
 Content-Type: application/json
 
 {
@@ -179,12 +181,12 @@ Nango processes tokens and sends webhook to `/webhooks/nango`:
 }
 ```
 
-### 5. Client Application Notification
+### 5. Central Service Notification
 
-Connections Service forwards to Client Application API:
+Connections Service forwards to Wuwei Central Service:
 
 ```http
-POST https://your-app.com/webhooks/connections
+POST https://your-wuwei-api.com/webhooks/connections
 Content-Type: application/json
 
 {
@@ -210,13 +212,26 @@ Content-Type: application/json
 For production, configure mutual TLS:
 
 1. Generate certificates for service-to-service communication
-2. Set certificate paths in environment variables
-3. Configure Wuwei API with corresponding client certificates
+2. Set certificate paths in environment variables (`MTLS_CERT_PATH`, `MTLS_KEY_PATH`, `MTLS_CA_PATH`)
+3. Configure Central Service (Wuwei) with corresponding client certificates
+4. Enable mTLS middleware in routes (currently disabled for development)
+
+**Note**: In development mode, mTLS verification is automatically skipped. For production deployment, ensure mTLS middleware is enabled in the route definitions.
 
 ### Webhook Verification
 
 - Nango webhooks are verified using HMAC signatures
-- Wuwei webhooks use mTLS client certificates
+- Central Service webhooks use mTLS client certificates
+
+### Audit Logging
+
+The service maintains comprehensive audit logs for all operations:
+
+- **Automatic Logging**: All connection events are logged automatically
+- **Data Sanitization**: Sensitive information (tokens, secrets, keys) is automatically redacted
+- **Multi-Actor Support**: Tracks actions from `wuwei`, `taoflow`, and `connections-service`
+- **Structured Data**: JSON-based details storage for flexible querying
+- **Tenant Isolation**: Logs are associated with tenant and user identifiers
 
 ## Supported Providers
 
@@ -241,9 +256,13 @@ GET /health
 
 ### Logs
 
-- Connection creation and completion
-- Webhook processing
-- Error handling and retries
+The service provides comprehensive logging at multiple levels:
+
+- **Connection Lifecycle**: Creation, updates, and deletion events
+- **Webhook Processing**: Nango webhook receipt and Central Service forwarding
+- **Audit Trail**: All operations logged to database with sanitized details
+- **Error Handling**: Detailed error logging with context
+- **Security Events**: mTLS verification and authentication attempts
 
 ## Development
 
@@ -263,6 +282,12 @@ npm run lint
 
 Set `LOG_LEVEL=debug` for verbose logging.
 
+### Development Notes
+
+- **mTLS Authentication**: Currently disabled in route definitions for development ease. Enable `requireMTLSAuth` middleware before production deployment.
+- **Database Migrations**: Run `npm run migrate` after pulling latest code to ensure database schema is up to date.
+- **Environment Variables**: Copy `.env.example` if available, or configure manually based on the environment section above.
+
 ## Production Deployment
 
 1. **Enable mTLS**: Configure client certificates
@@ -275,22 +300,27 @@ Set `LOG_LEVEL=debug` for verbose logging.
 ### Common Issues
 
 1. **"Nango webhook signature invalid"**
-   - Check `NANGO_WEBHOOK_SECRET` matches Nango dashboard
-2. **"mTLS certificate required"**
+   - Check `NANGO_WEBHOOK_SECRET` matches Nango dashboard configuration
+2. **"CENTRAL_SERVICE_URL not configured"**
+   - Ensure `CENTRAL_SERVICE_URL` environment variable is set to your Wuwei API endpoint
+3. **"mTLS certificate required"** (Production only)
 
    - Ensure certificates are properly configured
    - Check certificate paths and permissions
+   - Verify mTLS middleware is enabled in routes
 
-3. **"Connection not found"**
+4. **"Connection not found"**
    - Verify connectionId is correct
    - Check Nango dashboard for connection status
+   - Ensure connection exists in database
 
 ### Debug Steps
 
-1. Check service logs for detailed error messages
+1. Check service logs for detailed error messages with `LOG_LEVEL=debug`
 2. Verify Nango webhook delivery in dashboard
-3. Test mTLS connection with curl
+3. Test Central Service connectivity
 4. Validate environment configuration
+5. Check audit logs for operation history
 
 ## License
 

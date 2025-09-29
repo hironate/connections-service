@@ -16,9 +16,9 @@ class WebhookService {
 
     const formattedPayload = await this.createPayload(payload);
 
-    if (formattedPayload) {
-      await this.sendWebhook(formattedPayload);
-    }
+    // if (formattedPayload) {
+    //   await this.sendWebhook(formattedPayload);
+    // }
 
     return {
       processed: true,
@@ -51,12 +51,6 @@ class WebhookService {
     switch (type) {
       case WEBHOOK_TYPES.AUTH:
         return await authService.process(rest);
-      // case WEBHOOK_TYPES.SYNC:
-      //   return this.createSyncPayload(rest);
-      // case WEBHOOK_TYPES.FORWARD:
-      //   return this.createForwardPayload(rest);
-      // case WEBHOOK_TYPES.CONNECTION_ACTIVATED:
-      //   return this.createLegacyPayload(rest);
       default:
         console.log(`Unknown webhook type: ${type}`);
         return null;

@@ -76,14 +76,12 @@ class NangoService {
     } = options;
 
     try {
-      const integrationKey = this.getIntegrationKey(provider);
-
       const { data } = await this.client.createConnectSession({
         end_user: {
           id: userId,
           tags,
         },
-        allowed_integrations: [integrationKey],
+        allowed_integrations: [provider],
         organization: {
           id: organizationId,
           // display_name: organizationName,
@@ -106,6 +104,40 @@ class NangoService {
       throw new Error(
         `Failed to create connect session: ${errorInfo.userMessage}`,
       );
+    }
+  }
+
+  async update({
+    provider,
+    connectionId,
+    scopes = [],
+    userId,
+    organizationId,
+  }) {
+    try {
+      const { data } = await this.client.createReconnectSession({
+        connection_id: connectionId,
+        end_user: {
+          id: userId,
+          tags: {
+            scopes: scopes.join(' '),
+          },
+        },
+        organization: {
+          id: organizationId,
+        },
+        integration_id: provider,
+        integrations_config_defaults: {
+          [provider]: {
+            user_scopes: scopes.join(' '),
+          },
+        },
+      });
+
+      return data;
+    } catch (error) {
+      const errorInfo = this.handleNangoError(error, 'update');
+      throw new Error(`Failed to reconnect: ${errorInfo.userMessage}`);
     }
   }
 
@@ -244,9 +276,8 @@ class NangoService {
     return metadata;
   }
 
-  buildAuthUrl({ provider, connectionId, connectSessionToken }) {
-    const configKey = this.getIntegrationKey(provider);
-    const url = new URL(`${this.auth_url}/${configKey}`);
+  buildAuthUrl({ provider, connectSessionToken }) {
+    const url = new URL(`${this.auth_url}/${provider}`);
     url.searchParams.append('connect_session_token', connectSessionToken);
 
     return url.toString();
@@ -273,19 +304,6 @@ class NangoService {
         error: errorInfo,
       };
     }
-  }
-
-  /**
-   * Map provider names to Nango integration keys
-   */
-  getIntegrationKey(provider) {
-    const integrationKey = DEFAULT_PROVIDERS[provider.toUpperCase()];
-
-    if (!integrationKey) {
-      throw new Error(`Unsupported provider: ${provider}`);
-    }
-
-    return integrationKey;
   }
 
   /**

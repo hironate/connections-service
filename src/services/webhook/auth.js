@@ -7,12 +7,36 @@ const {
 
 class WebhookAuthService {
   async process(payload) {
-    const { operation, endUser, connectionId, provider } = payload;
-    const { endUserId, organizationId, tags } = endUser;
+    const { operation, endUser, provider } = payload;
+    const { organizationId } = endUser;
 
-    if (operation !== AUTH_OPERATIONS.CREATION) {
-      return;
+    let connection = null;
+
+    switch (operation) {
+      case AUTH_OPERATIONS.CREATION:
+        connection = await this.handleCreation(payload);
+        break;
+      case AUTH_OPERATIONS.OVERRIDE:
+        connection = await this.handleOverride(payload);
+        break;
+      default:
+        throw new Error('Invalid operation');
     }
+
+    return {
+      type: DEFAULT_RESPONSE_EVENT.auth.creation,
+      eventId: generateEventId(),
+      connectionId: connection.id,
+      tenantId: organizationId,
+      userSub: connection.sub,
+      provider,
+      scopes: connection.authorizedScopes || [], // Renamed from authorizedScopes to scopes
+    };
+  }
+
+  async handleCreation(payload) {
+    const { endUser, connectionId, provider } = payload;
+    const { endUserId, organizationId, tags } = endUser;
 
     const where = tags?.connectId
       ? { id: tags.connectId }
@@ -22,23 +46,27 @@ class WebhookAuthService {
           tenantId: organizationId,
         };
 
-    const connection = await databaseService.updateConnection({
+    return await databaseService.updateConnection({
       where,
       updateData: {
         status: 'active',
         connectionId,
       },
     });
+  }
 
-    return {
-      type: DEFAULT_RESPONSE_EVENT.auth.creation,
-      eventId: generateEventId(),
-      connectionId: connection.id,
-      tenantId: organizationId,
-      userSub: connection.sub,
-      provider,
-      authorizedScopes: connection.authorizedScopes || [],
-    };
+  async handleOverride(payload) {
+    const { endUser, connectionId } = payload;
+    const { tags } = endUser;
+
+    const where = { connectionId };
+
+    return await databaseService.updateConnection({
+      where,
+      updateData: {
+        ...(tags?.scopes ? { authorizedScopes: tags.scopes?.split(' ') } : {}),
+      },
+    });
   }
 }
 

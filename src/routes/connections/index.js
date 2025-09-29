@@ -3,6 +3,7 @@ const {
   getConnection,
   deleteConnection,
   getConnections,
+  updateConnection,
 } = require('../../controllers/connections');
 const { requireMTLSAuth } = require('../../middleware/auth');
 
@@ -11,6 +12,12 @@ module.exports = (app) => {
     '/v1/tenants/:tenantId/connections',
     // requireMTLSAuth,
     createConnection,
+  );
+
+  app.patch(
+    '/v1/tenants/:tenantId/connections/:connectionId',
+    // requireMTLSAuth,
+    updateConnection,
   );
 
   app.get(
