@@ -87,7 +87,7 @@ class NangoService {
           // display_name: organizationName,
         },
         integrations_config_defaults: {
-          [integrationKey]: {
+          [provider]: {
             user_scopes: scopes.join(' '),
             connection_config: connectionConfig,
           },
