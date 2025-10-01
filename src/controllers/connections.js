@@ -30,7 +30,6 @@ const getConnections = async (req, res) => {
       });
     }
 
-    // Filter connection data to only include non-confidential fields
     const filteredConnections = connections.map(filterConnectionData);
 
     res.json({
@@ -58,9 +57,7 @@ const getConnection = async (req, res) => {
       });
     }
 
-    const connection = await databaseService.getConnectionById({
-      id: connectionId,
-    });
+    const connection = await databaseService.getConnectionById(connectionId);
 
     if (!connection) {
       return res.status(404).json({
@@ -70,7 +67,6 @@ const getConnection = async (req, res) => {
       });
     }
 
-    // Filter connection data to only include non-confidential fields
     const filteredConnection = filterConnectionData(connection);
 
     res.json({

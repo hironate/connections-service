@@ -34,6 +34,12 @@ This service acts as a secure proxy between your application and OAuth providers
 - `PATCH /v1/tenants/{tenantId}/connections/{connectionId}` - Update connection details
 - `DELETE /v1/tenants/{tenantId}/connections/{connectionId}` - Delete connection
 
+### Connection Tokens (TaoFlow)
+
+- `GET /v1/connection-tokens/connections` - List user connections (requires delegated token)
+- `POST /v1/connection-tokens/{connectionId}/access-token` - Get provider access token (delegation token in body)
+- `GET /v1/connection-tokens/provider-data` - Get provider data using connection token
+
 ### Webhooks
 
 - `POST /webhooks/nango` - Receive Nango webhook notifications
@@ -201,6 +207,85 @@ Content-Type: application/json
   "metadata": {
     "username": "johndoe",
     "avatar": "https://github.com/avatar.jpg"
+  }
+}
+```
+
+## Connection Token Flow (TaoFlow Specification)
+
+The TaoFlow connection system allows external clients to get provider access tokens using delegation tokens:
+
+### 1. List User Connections
+
+```http
+GET /v1/connection-tokens/connections
+Authorization: Bearer <delegated-token>
+```
+
+Returns active connections for the authenticated user.
+
+### 2. Get Provider Access Token
+
+```http
+POST /v1/connection-tokens/{connectionId}/access-token
+Content-Type: application/json
+
+{
+  "delegationToken": "JWT from WA",
+  "minTtlSeconds": 300,
+  "requestedScopes": ["repo", "user:email"]
+}
+```
+
+**TaoFlow Security Validation:**
+
+1. **JWT**: Decode and validate claims: `aud=connections-service`, `azp=taoflow-backend`, `iss=wuwei-backend`, `exp`, `jti` (single‑use cache)
+2. **Tuple match**: `tenantId` (path) == `tid` (token), `connectionId` (path) == `cid` (token)
+3. **Ownership**: Look up `cid` in SoR; ensure `{tenant, sub}` owns it and `status=active`
+4. **Version check**: `cver` (token) == stored `connectionVersion`
+5. **Scope check**: `requestedScopes` (body) ⊆ `scp` (token) ⊆ `authorizedScopes` (stored)
+6. **TTL policy**: If cached vendor access token has `expiresIn >= minTtlSeconds`, return it; else refresh
+7. **Audit**: Log access token request
+
+Returns the actual provider access token:
+
+```json
+{
+  "accessToken": "opaque vendor token",
+  "expiresIn": 900,
+  "authorizedScopes": ["repo", "user:email"],
+  "vendor": {
+    "accountId": "github-user-123"
+  }
+}
+```
+
+### 3. Access Provider Data (Legacy)
+
+```http
+GET /v1/connection-tokens/provider-data
+Authorization: Bearer <connection-token>
+```
+
+Returns provider connection metadata and status (no actual tokens exposed):
+
+```json
+{
+  "success": true,
+  "data": {
+    "connection": {
+      "id": "conn-123",
+      "provider": "github",
+      "scopes": ["repo", "user:email"],
+      "status": "active",
+      "metadata": {}
+    },
+    "providerAccount": {
+      "account_id": "github-user-id",
+      "display_name": "John Doe"
+    },
+    "hasValidToken": true,
+    "lastAccessedAt": "2024-01-01T12:00:00.000Z"
   }
 }
 ```

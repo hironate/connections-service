@@ -1,3 +1,4 @@
+const { createAccessToken } = require('../../controllers/connection-token');
 const {
   createConnection,
   getConnection,
@@ -36,5 +37,11 @@ module.exports = (app) => {
     '/v1/tenants/:tenantId/connections/:connectionId',
     // requireMTLSAuth,
     deleteConnection,
+  );
+
+  app.post(
+    '/v1/tenants/:tenantId/connections/:connectionId/access-tokens',
+    // requireMTLSAuth,
+    createAccessToken,
   );
 };
