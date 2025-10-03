@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 
 class DelegationTokenService {
   constructor() {
-    console.log('Initializing Delegation Token Service');
+    this.delegationTokenSecret = process.env.DELEGATION_TOKEN_SECRET;
   }
 
   /**
@@ -24,39 +24,20 @@ class DelegationTokenService {
 
       return payload;
     } catch (error) {
-      console.error('Delegation token validation error:', error);
-
-      if (error.name === 'TokenExpiredError') {
-        throw new Error('Delegation token has expired');
-      } else if (error.name === 'JsonWebTokenError') {
-        throw new Error('Invalid delegation token');
-      }
-
       throw error;
     }
   }
 
   async verifyToken(token) {
     try {
-      const decoded = jwt.decode(token, { complete: true });
-
-      if (!decoded) {
-        throw new Error('Invalid token format');
-      }
-
-      console.log('Token header:', JSON.stringify(decoded.header, null, 2));
-      console.log('Token payload:', JSON.stringify(decoded.payload, null, 2));
-
-      const payload = decoded.payload;
-
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp < currentTime) {
-        throw new Error('Token has expired');
-      }
-
+      const payload = jwt.verify(token, this.delegationTokenSecret, {
+        issuer: 'wuwei-backend',
+        audience: 'connections-service',
+        algorithms: ['HS256', 'HS512', 'RS256'],
+      });
+      console.log('Delegation token verified:', payload);
       return payload;
     } catch (error) {
-      console.error('Token verification error:', error);
       throw error;
     }
   }

@@ -26,20 +26,12 @@ const createAccessToken = async (req, res) => {
       connectionId,
     );
 
-    const { sub, tid, cid, scp, jti, cver } = tokenPayload;
+    const { sub, scp, jti, cver } = tokenPayload;
 
     if (connection.sub !== sub) {
       return res.status(403).json({
         success: false,
         error: 'Connection does not belong to authenticated user',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (connection.tenantId !== tid) {
-      return res.status(403).json({
-        success: false,
-        error: 'Connection does not belong to tenant',
         timestamp: new Date().toISOString(),
       });
     }
@@ -98,7 +90,7 @@ const createAccessToken = async (req, res) => {
       }
     }
 
-    await connection.updateLastAccessed(transaction);
+    await connection.updateLastAccessed();
     return res.status(200).json({
       access_token: accessTokenData.access_token,
       expires_in: Math.floor(tokenExpiresIn),
@@ -110,9 +102,6 @@ const createAccessToken = async (req, res) => {
       },
     });
   } catch (error) {
-    transaction.rollback();
-    console.error('Error getting access token:', error);
-
     let statusCode = 500;
     let errorMessage = 'Failed to get access token';
 
