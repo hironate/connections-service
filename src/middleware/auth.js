@@ -6,13 +6,11 @@ const { UnauthorizedError } = require('../utils/errors');
 
 const requireMTLSAuth = (req, res, next) => {
   try {
-    // In development, skip mTLS verification
     if (process.env.NODE_ENV === 'development') {
       console.log('Development mode - skipping mTLS verification');
       return next();
     }
 
-    // Check for client certificate
     const cert = req.connection.getPeerCertificate();
 
     if (!cert || !cert.subject) {
@@ -21,7 +19,6 @@ const requireMTLSAuth = (req, res, next) => {
       });
     }
 
-    // Verify certificate is from Wuwei API
     const expectedCN = 'wuwei-api';
     if (cert.subject.CN !== expectedCN) {
       return res.status(401).json({
@@ -47,7 +44,6 @@ const verifyNangoWebhook = (req, res, next) => {
       throw new UnauthorizedError('Missing X-Nango-Signature header');
     }
 
-    // In development mode, optionally skip verification for testing
     if (
       process.env.NODE_ENV === 'development' &&
       process.env.SKIP_WEBHOOK_VERIFICATION === 'true'
@@ -59,7 +55,6 @@ const verifyNangoWebhook = (req, res, next) => {
       return next();
     }
 
-    // Use Nango SDK for verification - this handles the signature logic internally
     const isValid = nangoService.verifyWebhookSignature(signature, req.body);
 
     if (!isValid) {
@@ -86,9 +81,6 @@ const verifyNangoWebhook = (req, res, next) => {
   }
 };
 
-/**
- * Verify OIDC JWT from Wuwei (for debugging/admin endpoints)
- */
 const verifyOIDCToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -101,14 +93,12 @@ const verifyOIDCToken = async (req, res, next) => {
 
     const token = authHeader.substring(7);
 
-    // Initialize JWKS client
     const client = jwksClient({
       jwksUri: process.env.OIDC_JWKS_URL,
       cache: true,
       cacheMaxAge: 600000, // 10 minutes
     });
 
-    // Decode token to get key ID
     const decoded = jwt.decode(token, { complete: true });
 
     if (!decoded) {
@@ -117,7 +107,6 @@ const verifyOIDCToken = async (req, res, next) => {
       });
     }
 
-    // Get signing key
     const key = await new Promise((resolve, reject) => {
       client.getSigningKey(decoded.header.kid, (err, key) => {
         if (err) reject(err);
@@ -127,7 +116,6 @@ const verifyOIDCToken = async (req, res, next) => {
 
     const signingKey = key.getPublicKey();
 
-    // Verify token
     const payload = jwt.verify(token, signingKey, {
       issuer: process.env.OIDC_ISSUER,
       algorithms: ['RS256'],
@@ -143,8 +131,70 @@ const verifyOIDCToken = async (req, res, next) => {
   }
 };
 
+const verifyDelegatedToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Bearer token required',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const token = authHeader.substring(7);
+
+    const client = jwksClient({
+      jwksUri: process.env.OIDC_JWKS_URL,
+      cache: true,
+      cacheMaxAge: 600000, // 10 minutes
+    });
+
+    const decoded = jwt.decode(token, { complete: true });
+
+    if (!decoded) {
+      return res.status(401).json({
+        error: 'Invalid token format',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const key = await new Promise((resolve, reject) => {
+      client.getSigningKey(decoded.header.kid, (err, key) => {
+        if (err) reject(err);
+        else resolve(key);
+      });
+    });
+
+    const signingKey = key.getPublicKey();
+
+    const payload = jwt.verify(token, signingKey, {
+      issuer: process.env.OIDC_ISSUER,
+      algorithms: ['RS256'],
+    });
+
+    req.delegatedToken = payload;
+    next();
+  } catch (error) {
+    console.error('Delegated token verification error:', error);
+
+    let errorMessage = 'Invalid delegated token';
+    if (error.name === 'TokenExpiredError') {
+      errorMessage = 'Delegated token has expired';
+    } else if (error.name === 'JsonWebTokenError') {
+      errorMessage = 'Invalid delegated token format';
+    }
+
+    return res.status(401).json({
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   requireMTLSAuth,
   verifyNangoWebhook,
   verifyOIDCToken,
+  verifyDelegatedToken,
 };
